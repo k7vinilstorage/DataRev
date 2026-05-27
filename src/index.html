@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataRev</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/assets/leaflet.min.css" />
+  <script src="/assets/leaflet.min.js"></script>
+  <script src="/assets/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ══ LOGIN ═════════════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-stripe"></div>
+      <span>DATAREV</span>
+      <div class="logo-stripe"></div>
+    </div>
+
+    <!-- Language switcher -->
+    <div class="lang-switcher">
+      <button class="lang-btn active" data-lang="pt">PT</button>
+      <button class="lang-btn" data-lang="en">EN</button>
+    </div>
+
+    <p class="login-sub" data-i18n="login.sub">Conexão ao Dashboard MQTT</p>
+
+    <!-- Connection type selector -->
+    <div class="conn-type-switcher">
+      <button class="conn-type-btn active" data-conn="mqtt">MQTT</button>
+      <button class="conn-type-btn" data-conn="serial">Serial</button>
+    </div>
+
+    <!-- ── MQTT fields ── -->
+    <div id="conn-mqtt-fields">
+      <div class="form-group">
+        <label class="field-label" data-i18n="login.broker">MQTT BROKER</label>
+        <input id="broker" type="text" placeholder="tcp://host:1883" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="field-label" data-i18n="login.topic">TÓPICO</label>
+        <input id="topic" type="text" placeholder="telemetry/#" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="field-label" data-i18n="login.username">USUÁRIO</label>
+          <input id="username" type="text" placeholder="username" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="field-label" data-i18n="login.password">SENHA</label>
+          <input id="password" type="password" placeholder="••••••" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Serial fields ── -->
+    <div id="conn-serial-fields" style="display:none">
+      <div class="form-group">
+        <label class="field-label" data-i18n="serial.port">PORTA</label>
+        <div class="serial-port-row">
+          <select id="serial-port-select">
+            <option value="" data-i18n="serial.noPorts">Nenhuma porta encontrada</option>
+          </select>
+          <button id="serial-scan-btn" class="serial-scan-btn" data-i18n-title="serial.scan" title="Escanear portas">↻</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="field-label" data-i18n="serial.baud">TAXA DE BAUD</label>
+        <select id="serial-baud-select" class="serial-baud-select">
+          <option value="9600">9600</option>
+          <option value="19200">19200</option>
+          <option value="38400">38400</option>
+          <option value="57600">57600</option>
+          <option value="115200" selected>115200</option>
+          <option value="230400">230400</option>
+          <option value="460800">460800</option>
+          <option value="921600">921600</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="connect-btn" data-i18n="login.connect">CONECTAR</button>
+    <div id="status-msg"></div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══════════════════════════════════════════════════════════════ -->
+<div id="dashboard" style="display:none">
+
+  <!-- Tab bar -->
+  <div id="tab-bar">
+    <div class="tab-brand">⬡ DR</div>
+    <div class="tab active" data-tab="overview" data-i18n="tab.overview">Visão Geral</div>
+    <div class="tab" data-tab="graph"    data-i18n="tab.graphs">Gráficos</div>
+    <div class="tab" data-tab="gps"      data-i18n="tab.gps">GPS</div>
+    <div class="tab" data-tab="advanced" data-i18n="tab.advanced">Avançado</div>
+    <div class="tab" data-tab="controls" data-i18n="tab.controls">Controles</div>
+    <div class="tab" data-tab="logs"     data-i18n="tab.logs">Logs</div>
+    <div class="tab-spacer"></div>
+    <button id="disconnect-btn" data-i18n="tab.disconnect">⏻ Desconectar</button>
+  </div>
+
+  <!-- Tab content -->
+  <div id="tab-content">
+
+    <!-- ── OVERVIEW ───────────────────────────────────────────────────────── -->
+    <div id="tab-overview" class="tab-pane active">
+      <div class="tile-grid">
+
+        <div class="tile" id="tile-rpm">
+          <canvas id="rpm-canvas" width="500" height="500"></canvas>
+          <div class="rpm-overlay" id="rpm-value">0</div>
+        </div>
+
+        <div class="tile" id="tile-temp">
+          <canvas id="temp-canvas" width="500" height="500"></canvas>
+        </div>
+
+        <div class="tile" id="tile-fuel">
+          <canvas id="fuel-canvas" width="500" height="500"></canvas>
+        </div>
+
+        <div class="tile" id="tile-speed">
+          <canvas id="speed-canvas" width="500" height="500"></canvas>
+        </div>
+
+        <!-- BRAKE DISC TEMPS + CAR -->
+        <div class="tile tire-tile">
+          <div class="tire-layout">
+            <div class="tire-col">
+              <div class="tire-slot">
+                <canvas id="disc-fl" width="56" height="130"></canvas>
+                <span class="tire-val" id="disc-fl-val">0</span>
+                <span class="tire-pos">FL</span>
+              </div>
+              <div class="tire-slot">
+                <canvas id="disc-rl" width="56" height="130"></canvas>
+                <span class="tire-val" id="disc-rl-val">0</span>
+                <span class="tire-pos">RL</span>
+              </div>
+            </div>
+            <div class="tire-car">
+              <img src="/assets/car.png" alt="car" />
+            </div>
+            <div class="tire-col">
+              <div class="tire-slot">
+                <canvas id="disc-fr" width="56" height="130"></canvas>
+                <span class="tire-val" id="disc-fr-val">0</span>
+                <span class="tire-pos">FR</span>
+              </div>
+              <div class="tire-slot">
+                <canvas id="disc-rr" width="56" height="130"></canvas>
+                <span class="tire-val" id="disc-rr-val">0</span>
+                <span class="tire-pos">RR</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile" id="tile-map">
+          <canvas id="map-canvas" width="500" height="500"></canvas>
+        </div>
+
+        <div class="tile tps-tile" id="tile-tps">
+          <span class="tps-label-top">TPS</span>
+          <canvas id="tps-canvas" width="114" height="250"></canvas>
+          <span class="tps-val" id="tps-val">0%</span>
+        </div>
+
+        <!-- KEY VALUES + GEAR -->
+        <div class="tile kv-tile">
+          <div class="gear-block">
+            <span class="gear-label" data-i18n="ov.gear">MARCHA</span>
+            <span class="gear-value" id="gear-display">—</span>
+          </div>
+          <div class="kv-divider"></div>
+          <div class="kv-grid">
+            <div class="kv-cell"><span class="kl" data-i18n="ov.lambda">Lambda</span><span class="kv" id="ov-lambda">—</span></div>
+            <div class="kv-cell"><span class="kl">EGT 1</span><span class="kv" id="ov-egt1">—</span></div>
+            <div class="kv-cell"><span class="kl" data-i18n="ov.fuelPress">Press. Comb.</span><span class="kv" id="ov-fuel-press">—</span></div>
+            <div class="kv-cell"><span class="kl">EGT 2</span><span class="kv" id="ov-egt2">—</span></div>
+            <div class="kv-cell"><span class="kl" data-i18n="ov.oilPress">Press. Óleo</span><span class="kv" id="ov-oil-press">—</span></div>
+            <div class="kv-cell"><span class="kl">EGT 3</span><span class="kv" id="ov-egt3">—</span></div>
+            <div class="kv-cell"><span class="kl" data-i18n="ov.airTemp">Temp. Ar</span><span class="kv" id="ov-air-temp">—</span></div>
+            <div class="kv-cell"><span class="kl">EGT 4</span><span class="kv" id="ov-egt4">—</span></div>
+          </div>
+        </div>
+
+      </div><!-- tile-grid -->
+    </div><!-- tab-overview -->
+
+    <!-- ── GRAPH ──────────────────────────────────────────────────────────── -->
+    <div id="tab-graph" class="tab-pane">
+      <div class="graph-layout">
+
+        <div class="graph-sidebar">
+          <div class="graph-controls">
+            <div class="tr-group">
+              <button class="tr-btn active" data-s="30">30s</button>
+              <button class="tr-btn" data-s="60">1m</button>
+              <button class="tr-btn" data-s="300">5m</button>
+              <button class="tr-btn" data-s="600">10m</button>
+            </div>
+            <button id="clear-history-btn" data-i18n="graph.clear">✕ Limpar</button>
+          </div>
+          <div class="graph-stats">
+            <span id="graph-pts">0 pts</span>
+          </div>
+          <div class="log-section">
+            <button id="log-btn">
+              <span class="log-btn-dot" id="log-dot">●</span>
+              <span id="log-btn-label" data-i18n="graph.startLog">Iniciar Log</span>
+            </button>
+            <div class="log-info" id="log-info" style="display:none">
+              <span class="log-info-label"><span data-i18n="graph.session">Sessão #</span><span id="log-session-id">—</span></span>
+              <span class="log-info-count"><span id="log-pkt-count">0</span> pkts</span>
+            </div>
+          </div>
+          <div class="channel-list" id="channel-list"><!-- built by JS --></div>
+        </div>
+
+        <div class="graph-chart-wrap">
+          <canvas id="telemetry-chart"></canvas>
+        </div>
+
+      </div>
+    </div><!-- tab-graph -->
+
+    <!-- ── ADVANCED ───────────────────────────────────────────────────────── -->
+    <div id="tab-advanced" class="tab-pane">
+      <div class="cards-flow">
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.engine">MOTOR</div>
+          <div class="card-row"><span class="cl">RPM</span><span class="cv" id="a-rpm">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.coolant">Refrigerante</span><span class="cv" id="a-temp">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.gear">Marcha</span><span class="cv" id="a-gear">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.voltage">Tensão</span><span class="cv" id="a-bat">—</span></div>
+          <div class="card-row"><span class="cl">TPS</span><span class="cv" id="a-tps">—</span></div>
+          <div class="card-row"><span class="cl">MAP</span><span class="cv" id="a-map">—</span></div>
+          <div class="card-row card-row-full"><span class="cl">Lambda</span><span class="cv" id="a-lambda">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.pressTemps">PRESSÕES &amp; TEMPS</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.oilPressure">Pressão Óleo</span><span class="cv" id="a-oil-press">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.fuelPressure">Pressão Comb.</span><span class="cv" id="a-fuel-press">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.intakeTemp">Temp. Admissão</span><span class="cv" id="a-air-temp">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.oilTemp">Temp. Óleo</span><span class="cv" id="a-oil-temp">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.egt">ESCAPE — EGT</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.cyl1">Cilindro 1</span><span class="cv" id="a-egt1">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.cyl2">Cilindro 2</span><span class="cv" id="a-egt2">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.cyl3">Cilindro 3</span><span class="cv" id="a-egt3">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.cyl4">Cilindro 4</span><span class="cv" id="a-egt4">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.wheelSpeeds">VELOCIDADES DAS RODAS</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.frontLeft">Dianteiro Esq.</span><span class="cv" id="a-speed-fl">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.frontRight">Dianteiro Dir.</span><span class="cv" id="a-speed-fr">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.rearLeft">Traseiro Esq.</span><span class="cv" id="a-speed-rl">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.rearRight">Traseiro Dir.</span><span class="cv" id="a-speed-rr">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.brakeDisc">TEMP. DISCO DE FREIO</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.frontLeft">Dianteiro Esq.</span><span class="cv" id="a-disc-fl">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.frontRight">Dianteiro Dir.</span><span class="cv" id="a-disc-fr">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.rearLeft">Traseiro Esq.</span><span class="cv" id="a-disc-rl">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.rearRight">Traseiro Dir.</span><span class="cv" id="a-disc-rr">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.dynamics">DINÂMICA DO VEÍCULO</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.lonG">G Longitudinal</span><span class="cv" id="a-gforce-a">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.latG">G Lateral</span><span class="cv" id="a-gforce-l">—</span></div>
+          <div class="card-row card-row-full"><span class="cl" data-i18n="adv.tracCtrl">Controle de Tração</span><span class="cv" id="a-trac">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.injection">INJEÇÃO</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.injA">Injetor A</span><span class="cv" id="a-inj-a">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.injB">Injetor B</span><span class="cv" id="a-inj-b">—</span></div>
+        </div>
+
+        <div class="data-card">
+          <div class="card-title" data-i18n="adv.gpsTelemetry">GPS &amp; TELEMETRIA</div>
+          <div class="card-row"><span class="cl" data-i18n="adv.gpsSpeed">Veloc. GPS</span><span class="cv" id="a-gps-speed">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.signal">Sinal 4G</span><span class="cv" id="a-signal">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.uptimeMin">Uptime (min)</span><span class="cv" id="a-minutes">—</span></div>
+          <div class="card-row"><span class="cl" data-i18n="adv.uptimeSec">Uptime (seg)</span><span class="cv" id="a-seconds">—</span></div>
+          <div class="card-row card-row-full"><span class="cl" data-i18n="adv.coords">Coordenadas</span><span class="cv" id="a-gps-pos">—</span></div>
+        </div>
+
+      </div>
+    </div><!-- tab-advanced -->
+
+    <div id="tab-controls" class="tab-pane placeholder-pane" data-i18n="ctrl.soon">Controles — em breve</div>
+
+    <!-- ── LOGS ─────────────────────────────────────────────────────────────── -->
+    <div id="tab-logs" class="tab-pane">
+      <div class="logview-layout">
+
+        <!-- Sessions panel -->
+        <div class="logview-sessions-panel">
+          <div class="logview-panel-header">
+            <span class="logview-panel-title" data-i18n="logs.sessions">Sessões</span>
+            <div class="logview-panel-actions">
+              <button class="lv-action-btn" id="refresh-sessions-btn"
+                      data-i18n-title="logs.refreshTitle" title="Atualizar lista">↻</button>
+              <button class="lv-action-btn" id="export-csv-btn"
+                      data-i18n-title="logs.exportTitle"
+                      title="Exportar sessão selecionada como CSV" disabled>⬇ CSV</button>
+              <button class="lv-action-btn" id="open-log-dir-btn"
+                      data-i18n-title="logs.openDirTitle" title="Abrir pasta de logs">📁</button>
+            </div>
+          </div>
+          <div class="lv-export-status" id="lv-export-status"></div>
+          <div class="session-list" id="session-list">
+            <div class="session-empty" data-i18n="logs.noSessions">Nenhuma sessão gravada</div>
+          </div>
+          <div class="log-dir-path" id="log-dir-path"></div>
+        </div>
+
+        <!-- Channel toggles panel -->
+        <div class="logview-channels-panel">
+          <div class="logview-panel-header">
+            <span class="logview-panel-title" data-i18n="logs.channels">Canais</span>
+          </div>
+          <div class="channel-list" id="logview-channel-list"></div>
+        </div>
+
+        <!-- Chart area -->
+        <div class="logview-chart-wrap">
+
+          <!-- Zoom + scrubber toolbar -->
+          <div class="logview-chart-controls">
+            <div class="lv-zoom-group">
+              <button class="lv-zoom-btn active" data-ms="0" data-i18n="logs.all">Tudo</button>
+              <button class="lv-zoom-btn" data-ms="30000">30s</button>
+              <button class="lv-zoom-btn" data-ms="60000">1m</button>
+              <button class="lv-zoom-btn" data-ms="300000">5m</button>
+              <button class="lv-zoom-btn" data-ms="600000">10m</button>
+            </div>
+            <input type="range" id="log-scrubber" min="0" max="1000" value="0" step="1" disabled />
+            <span id="lv-time-display">—</span>
+            <label class="lv-gps-toggle-wrap" data-i18n-title="logs.showHideGps"
+                   title="Mostrar/ocultar seção GPS">
+              <input type="checkbox" id="lv-gps-toggle" checked>
+              <span class="lv-map-switch-track"><span class="lv-map-switch-thumb"></span></span>
+              <span class="lv-map-switch-label">⬡ GPS</span>
+            </label>
+          </div>
+
+          <!-- Canvas inner area -->
+          <div class="logview-chart-inner">
+            <canvas id="log-chart"></canvas>
+            <div class="graph-no-data" id="log-no-data" data-i18n="logs.noSession">Selecione uma sessão para visualizar</div>
+          </div>
+
+          <!-- GPS laps + map linked to this log session -->
+          <div class="lv-gps-section" id="lv-gps-section" style="display:none">
+            <div class="lv-gps-header">
+              <span class="lv-gps-title" data-i18n="logs.gpsSection">⬡ GPS — Voltas</span>
+              <span class="lv-gps-meta" id="lv-gps-meta"></span>
+            </div>
+            <div class="lv-gps-body">
+              <div class="lv-gps-laps" id="lv-gps-laps"></div>
+              <div class="lv-gps-map-wrap" id="lv-gps-map-wrap">
+                <div id="lv-map"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── GPS TRACK MAP ──────────────────────────────────────────────────── -->
+    <div id="tab-gps" class="tab-pane">
+      <div class="gps-layout">
+
+        <!-- Side panel -->
+        <div class="gps-side-panel">
+
+          <!-- Position data -->
+          <div class="gps-section">
+            <div class="gps-section-title" data-i18n="gps.positionTitle">POSIÇÃO GPS</div>
+            <div class="gps-kv"><span class="gps-kl" data-i18n="gps.latitude">Latitude</span> <span class="gps-kv-val" id="gps-lat">—</span></div>
+            <div class="gps-kv"><span class="gps-kl" data-i18n="gps.longitude">Longitude</span><span class="gps-kv-val" id="gps-lon">—</span></div>
+            <div class="gps-kv"><span class="gps-kl" data-i18n="gps.speed">Veloc. GPS</span><span class="gps-kv-val" id="gps-speed">—</span></div>
+            <div class="gps-kv"><span class="gps-kl" data-i18n="gps.track">Trilha</span>   <span class="gps-kv-val" id="gps-pts">0 pts</span></div>
+            <div class="gps-kv"><span class="gps-kl" data-i18n="gps.distance">Distância</span><span class="gps-kv-val" id="gps-dist">—</span></div>
+          </div>
+
+          <!-- Active lap timer (hidden when timing is off) -->
+          <div class="gps-section gps-timer-section" id="gps-timer-section" style="display:none">
+            <div class="gps-section-title"><span data-i18n="gps.lapTitle">VOLTA</span> <span id="gps-lap-num">1</span></div>
+            <div class="gps-timer-display" id="gps-lap-timer">0:00.00</div>
+            <div class="gps-kv">
+              <span class="gps-kl" data-i18n="gps.deltaBest">Δ Melhor</span>
+              <span class="gps-kv-val" id="gps-delta">—</span>
+            </div>
+          </div>
+
+          <!-- Lap history list -->
+          <div class="gps-section gps-laps-section">
+            <div class="gps-section-title" data-i18n="gps.lapsTitle">VOLTAS</div>
+            <div class="gps-laps-list" id="gps-laps-list">
+              <div class="gps-no-laps" data-i18n="gps.noLaps">Sem voltas gravadas</div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="gps-controls-panel">
+            <button class="gps-ctrl-btn" id="gps-osm-btn"    data-i18n="gps.mapOff">◐ Mapa: OFF</button>
+            <button class="gps-ctrl-btn" id="gps-center-btn" data-i18n="gps.center">◎ Centrar no Carro</button>
+            <button class="gps-ctrl-btn" id="gps-timing-btn" data-i18n="gps.startTiming">▶ Iniciar Timing</button>
+            <button class="gps-ctrl-btn gps-ctrl-danger" id="gps-clear-btn" data-i18n="gps.clearAll">✕ Limpar Tudo</button>
+          </div>
+
+        </div><!-- gps-side-panel -->
+
+        <!-- Leaflet map -->
+        <div class="gps-map-area" id="gps-map"></div>
+
+      </div>
+    </div><!-- tab-gps -->
+
+  </div><!-- tab-content -->
+
+  <!-- Status bar -->
+  <div id="status-bar">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="sb-broker">—</span>
+    <span class="sb-sep">|</span>
+    <span id="sb-rate">0 msg/s</span>
+    <span class="sb-sep">|</span>
+    <span class="sb-icon">⏱</span><span id="sb-session">00:00</span>
+    <span class="sb-sep">|</span>
+    <span class="sb-icon">◈</span><span id="sb-pts">0 pts</span>
+  </div>
+
+</div><!-- dashboard -->
+
+<script type="module" src="/main.js"></script>
+</body>
+</html>
