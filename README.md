@@ -4,6 +4,25 @@ Real-time motorsport telemetry dashboard. Receives data over MQTT or USB serial,
 
 ---
 
+## Screenshots
+
+| Connection | Overview |
+|---|---|
+| ![MQTT login](screenshots/mqtt.png) | ![Dashboard overview](screenshots/dashboard.png) |
+
+| Graphs | Advanced |
+|---|---|
+| ![Real-time graphs](screenshots/graphs.png) | ![Advanced readout](screenshots/advanced.png) |
+
+| GPS & Lap Timing | Session Logs |
+|---|---|
+| ![GPS map](screenshots/gps.png) | ![Log viewer](screenshots/logs.png) |
+
+**Serial connection**
+![Serial config](screenshots/Serial-config.png)
+
+---
+
 ## Table of Contents
 
 1. [Stack](#stack)
